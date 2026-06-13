@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compound × Chainlink SVR — Liquidation Ledger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0b0e14;--panel:#141926;--panel2:#1b2233;--line:#26304a;--txt:#e6ebf5;--mut:#8b97b3;
+    --comp:#00D395;--link:#5b7cf0;--linkD:#375BD2;--warn:#f5a623;--bad:#ff5c7c;--eth:#8ea2ff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:26px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  h1{margin:6px 0 8px;font-size:29px;line-height:1.15;font-weight:800}
+  h1 .g{color:var(--comp)} h1 .b{color:var(--link)}
+  .sub{color:var(--mut);font-size:15px;max-width:870px}
+  .asof{margin-top:10px;font-size:12.5px;color:var(--mut)} .asof b{color:var(--txt)}
+  h2{font-size:19px;margin:40px 0 4px;font-weight:700}
+  .h2sub{color:var(--mut);font-size:13.5px;margin-bottom:16px;max-width:880px}
+  .grid{display:grid;gap:14px}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:880px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.kpis{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .kpi .lab{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .kpi .val{font-size:25px;font-weight:800;margin-top:7px;letter-spacing:-.01em}
+  .kpi .val small{font-size:13px;font-weight:600;color:var(--mut)}
+  .kpi .note{font-size:12px;color:var(--mut);margin-top:6px}
+  .accent-g .val{color:var(--comp)} .accent-w .val{color:var(--warn)} .accent-e .val{color:var(--eth)}
+  .chain-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:18px 0 8px}
+  .mkts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:880px){.mkts{grid-template-columns:1fr}}
+  .mkt-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px}
+  .mkt-card .top{display:flex;justify-content:space-between;align-items:baseline}
+  .mkt-card .nm{font-size:15px;font-weight:800}
+  .mkt-card .st{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+  .st-live{background:rgba(0,211,149,.14);color:var(--comp)} .st-idle{background:rgba(245,166,35,.14);color:var(--warn)}
+  .mkt-card .addr{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--mut);margin:3px 0 11px}
+  .mkt-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px}
+  .mkt-grid .l{color:var(--mut)} .mkt-grid .v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+  .v.eth{color:var(--eth)}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 8px}
+  .canv{position:relative;height:320px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:880px){.two{grid-template-columns:1fr}}
+  .waterfall{display:flex;flex-direction:column;gap:9px}
+  .wf{display:grid;grid-template-columns:185px 1fr 150px;align-items:center;gap:12px;font-size:12.5px}
+  .wf .bar{height:24px;border-radius:6px;min-width:2px} .wf .num{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--mut)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}.sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .controls input,.controls select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 11px;font-size:13px;outline:none}
+  .controls input.search{min-width:190px}
+  .controls label{font-size:12.5px;color:var(--mut);display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .controls .spacer{flex:1}.controls .count{font-size:12.5px;color:var(--mut)}
+  .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:820px}
+  th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:nth-child(-n+4),td:nth-child(-n+4){text-align:left}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--panel2)}
+  th:hover{color:var(--txt)} th .ar{opacity:.5;font-size:9px}
+  tbody tr:hover{background:var(--panel2)}
+  td a{color:var(--link);text-decoration:none} td a:hover{text-decoration:underline}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .p-svr{background:rgba(0,211,149,.14);color:var(--comp)} .p-no{background:rgba(139,151,179,.12);color:var(--mut)} .p-unk{background:rgba(245,166,35,.13);color:var(--warn)}
+  .ch{font-size:11px;font-weight:700} .ch.Ethereum{color:#8ea2ff} .ch.Base{color:#3c8aff} .ch.Arbitrum{color:#5ea8d8}
+  .co{font-weight:700;font-size:11.5px}
+  .ethv{color:var(--eth);font-variant-numeric:tabular-nums}
+  .more{display:block;width:100%;background:var(--panel2);border:1px solid var(--line);border-top:0;color:var(--link);padding:12px;font-size:13px;font-weight:600;cursor:pointer}
+  .more:hover{background:#222c41}
+  .meth{font-size:13px;color:var(--mut)} .meth p{margin:0 0 11px} .meth b{color:var(--txt)} .meth code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:11.5px;color:var(--link)}
+  a{color:var(--link)} .foot{margin-top:42px;border-top:1px solid var(--line);padding-top:18px;color:var(--mut);font-size:12px}
+  .flag{background:linear-gradient(180deg,rgba(255,92,124,.09),rgba(255,92,124,.03));border:1px solid rgba(255,92,124,.30);border-radius:14px;padding:16px 19px;margin-top:16px;font-size:13.5px}
+  .flag b{color:var(--bad)}
+  #err{display:none;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4);border-radius:12px;padding:16px 18px;font-size:13.5px;color:var(--warn);margin-top:20px}
+  #err code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:var(--txt)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Compound DAO · On-chain liquidation analysis</div>
+  <h1>Chainlink <span class="b">SVR</span> — <span class="g">Liquidation Ledger</span></h1>
+  <p class="sub">Every liquidation on Compound's SVR-onboarded markets since launch: value liquidated, the OEV incentive available (from Compound's on-chain liquidation penalty), whether it routed through SVR, and how recaptured value — paid to the DAO in ETH — split between the DAO and Chainlink versus what leaked to liquidators.</p>
+  <div class="asof">8 comets across 3 chains · data through <b>12 Jun 2026</b> · recapture tracked in <b>ETH</b> (the currency the DAO is paid in) · SVR split <b>55% DAO / 45% Chainlink</b> · DAO recipient <span style="font-family:monospace">0xd9496…183cB</span>.</div>
+</header>
+
+<div id="err">Couldn't load <code>liq_data.json</code>. This page reads its data from that file in the same folder — open it via a web server or GitHub Pages (not a direct file:// double-click). Locally: run <code>python -m http.server</code> in this folder, then open <code>http://localhost:8000</code>.</div>
+
+<div class="grid kpis">
+  <div class="card kpi"><div class="lab">Liquidations (8 comets)</div><div class="val" id="k_n">—</div><div class="note" id="k_n2"></div></div>
+  <div class="card kpi accent-g"><div class="lab">Routed through SVR</div><div class="val" id="k_svr">—</div><div class="note" id="k_svr2"></div></div>
+  <div class="card kpi accent-w"><div class="lab">OEV incentive available</div><div class="val" id="k_av">—</div><div class="note">on-chain liquidation penalty, all comets</div></div>
+  <div class="card kpi accent-e"><div class="lab">Recaptured to DAO</div><div class="val">354.5 <small>ETH</small></div><div class="note">≈ $850K · Chainlink took ~290 ETH (45%)</div></div>
+</div>
+
+<h2>SVR markets</h2>
+<div class="h2sub">All comets where SVR price feeds were onboarded. Mainnet is live and earning; the Base &amp; Arbitrum comets were onboarded but show <b>no SVR recapture flowing on-chain yet</b> (the collector holds only dust on those chains).</div>
+<div id="markets"></div>
+
+<h2>Where the OEV went</h2>
+<div class="h2sub">Mainnet, all-time. "Available" is the theoretical-max liquidation discount across all 537 liquidations (collateral value × storeFrontPriceFactor × (1 − liquidationFactor)). Recaptured value is what reached the DAO + Chainlink; the rest leaked to liquidators — mostly via liquidations that never routed through SVR.</div>
+<div class="two">
+  <div class="chartbox"><div class="canv"><canvas id="routeChart"></canvas></div></div>
+  <div class="card">
+    <div class="waterfall" id="waterfall"></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--bad)"></i> Leaked to liquidators</span>
+      <span><i class="sw" style="background:var(--linkD)"></i> Chainlink 45%</span>
+      <span><i class="sw" style="background:var(--comp)"></i> Compound DAO 55%</span>
+    </div>
+  </div>
+</div>
+<div class="flag"><b>⚠ Most OEV never reaches the DAO.</b> <span id="leak_txt"></span></div>
+
+<h2>Liquidations over time</h2>
+<div class="h2sub">Mainnet monthly count — total vs. the subset routed through SVR.</div>
+<div class="chartbox"><div class="canv"><canvas id="monChart"></canvas></div></div>
+
+<h2>Full liquidation ledger</h2>
+<div class="h2sub">All 1,129 liquidations across the 8 comets. "Available" = on-chain OEV incentive. Recapture columns are in ETH (the DAO's receipt currency), allocated across SVR-routed mainnet liquidations by available incentive and reconciled to the verified on-chain total (354.49 ETH). Non-SVR / L2 rows: no recapture reached the DAO. Click a header to sort.</div>
+<div class="controls">
+  <input class="search" id="search" placeholder="Search borrower or tx…">
+  <select id="fchain"><option value="">All chains</option><option>Ethereum</option><option>Base</option><option>Arbitrum</option></select>
+  <select id="fco"><option value="">All comets</option></select>
+  <label><input type="checkbox" id="fsvr"> SVR-routed only</label>
+  <label><input type="checkbox" id="fdust" checked> hide dust (&lt; $1)</label>
+  <div class="spacer"></div><div class="count" id="rowcount"></div>
+</div>
+<div class="tbl-wrap">
+  <table id="tbl"><thead><tr>
+    <th data-k="d">Date<span class="ar"></span></th>
+    <th data-k="ch">Chain</th>
+    <th data-k="co">Comet</th>
+    <th data-k="b">Borrower</th>
+    <th data-k="vl">Value liquidated<span class="ar"></span></th>
+    <th data-k="av">Available OEV<span class="ar"></span></th>
+    <th data-k="svr">Via SVR<span class="ar"></span></th>
+    <th data-k="dao">→ DAO (ETH)<span class="ar"></span></th>
+    <th data-k="cl">→ Chainlink (ETH)<span class="ar"></span></th>
+  </tr></thead><tbody id="tbody"></tbody></table>
+  <button class="more" id="more">Show more</button>
+</div>
+
+<h2>Method &amp; reliability</h2>
+<div class="card meth">
+  <p><b>Comets.</b> SVR feeds were onboarded on 8 comets: Ethereum <code>cUSDCv3</code>/<code>cUSDTv3</code> (live since Oct/Sep 2025); Base <code>cUSDCv3</code>/<code>cWETHv3</code>/<code>cAEROv3</code> and Arbitrum <code>cUSDCv3</code>/<code>cUSDTv3</code>/<code>cWETHv3</code> (onboarded ~Dec 2025–2026; Arbitrum was pushed through despite the RFP vote not approving OEV there).</p>
+  <p><b>Liquidations &amp; available incentive.</b> Every <code>AbsorbDebt</code> event per comet (value liquidated = on-chain <code>usdValue</code>). Available OEV = Σ over seized collateral of <code>collateral_usd × storeFrontPriceFactor × (1 − liquidationFactor)</code>, all read on-chain (storeFrontPriceFactor 0.60, 0.70 on WETH comets; liquidationFactors per asset). This is the theoretical-max discount, so "leaked/missed" is an upper bound (real liquidator profit is net of gas and competition). Fully reliable inputs.</p>
+  <p><b>SVR routing &amp; recapture (ETH).</b> A liquidation is SVR-routed when the Chainlink collector Safe <code>0x149B…14e5</code> received an ETH bid in the same block — this reconciles with Chainlink's reported SVR counts. The verified anchor is the <b>354.49 ETH</b> delivered to Compound's DAO recipient (gross ≈ 644 ETH at 55/45). Per-row DAO/Chainlink ETH allocate that verified total across SVR-routed mainnet liquidations by available incentive; treat per-row figures as estimates, totals as exact. The collector is shared across Aave/Venus/Compound, so exact per-liquidation isolation isn't possible on-chain.</p>
+  <p><b>Base/Arbitrum.</b> Liquidations are enumerated, but the collector shows only dust on those chains — no SVR recapture is flowing on-chain yet, so those rows carry available incentive but no recapture. Base cUSDCv3 and Arbitrum cUSDCv3 are capped at the 200 most-recent in-window liquidations (L2 log pagination). Most L2 liquidations are sub-dollar test absorbs.</p>
+  <p><b>Sources.</b> <a href="https://www.comp.xyz/t/chainlink-svr-onboarding-on-usdc-mainnet/7298" target="_blank">USDC thread + Chainlink reports</a> · <a href="https://www.comp.xyz/t/chainlink-svr-onboarding-on-usdt-mainnet/7221" target="_blank">USDT</a> · <a href="https://www.comp.xyz/t/woof-base-svr-onboarding-proposals/7565" target="_blank">Base</a> · <a href="https://www.comp.xyz/t/woof-arbitrum-svr-onboarding-proposals/7606" target="_blank">Arbitrum</a> · <a href="https://docs.chain.link/data-feeds/svr-feeds" target="_blank">SVR docs</a> · on-chain via Blockscout.</p>
+</div>
+<div class="foot">Independent analysis for Compound governance. Liquidation events, available incentive, and routing flags are verifiable on-chain; per-liquidation recapture amounts are estimates reconciled to verified DAO receipts. Not financial advice.</div>
+</div>
+
+<script>
+const ADDR={"Ethereum|cUSDCv3":"0xc3d688…84cdc3","Ethereum|cUSDTv3":"0x3Afdc9…AB0840",
+  "Base|cUSDCv3":"0xb125E6…15Eb2F","Base|cWETHv3":"0x46e6b2…6970bf","Base|cAEROv3":"0x784efe…bECE89",
+  "Arbitrum|cUSDCv3":"0x9c4ec7…Ff58bf","Arbitrum|cUSDTv3":"0xd98Be0…a57d07","Arbitrum|cWETHv3":"0x6f7D51…dEe486"};
+const fmtUSD=v=>v==null?"—":(Math.abs(v)>=1e6?"$"+(v/1e6).toFixed(2)+"M":Math.abs(v)>=1000?"$"+Math.round(v).toLocaleString():"$"+v.toFixed(2));
+const fmtM=v=>"$"+(v/1e6).toFixed(1)+"M";
+const fmtETH=v=>(v==null||v===0)?"—":(v>=1?v.toFixed(2):v.toFixed(4));
+
+fetch('./liq_data.json').then(r=>r.json()).then(init).catch(()=>{document.getElementById('err').style.display='block';});
+
+function init(DATA){
+  const rows=DATA.rows, S=DATA.summary, M=DATA.monthly, CM=DATA.comets;
+
+  document.getElementById('k_n').textContent=S.n.toLocaleString();
+  document.getElementById('k_n2').textContent=(S.n-S.nsvr)+" never routed through SVR";
+  document.getElementById('k_svr').innerHTML=S.nsvr+' <small>('+Math.round(S.nsvr/S.n*100)+'%)</small>';
+  document.getElementById('k_svr2').textContent="all on Ethereum mainnet";
+  document.getElementById('k_av').textContent=fmtM(S.av_all);
+  document.getElementById('leak_txt').textContent=
+   `Of $${(S.av_eth/1e6).toFixed(2)}M in OEV available across mainnet liquidations, only ~$1.55M (19%) was recaptured — `+
+   `$0.85M to the DAO, $0.70M to Chainlink. The other ~$6.7M (81%) went to liquidators, the bulk of it on the liquidations that never routed through SVR.`;
+
+  const gridc='#26304a';Chart.defaults.color='#8b97b3';Chart.defaults.font.family="-apple-system,Segoe UI,Roboto,sans-serif";
+
+  const mEl=document.getElementById('markets');
+  ['Ethereum','Base','Arbitrum'].forEach(ch=>{
+    const h=document.createElement('div');h.className='chain-h';h.textContent=ch;mEl.appendChild(h);
+    const g=document.createElement('div');g.className='mkts';
+    CM.filter(c=>c.ch===ch).forEach(c=>{
+      const live=c.daoeth>0; const card=document.createElement('div');card.className='mkt-card';
+      card.innerHTML=`<div class="top"><span class="nm">${c.co}</span>`+
+        `<span class="st ${live?'st-live':'st-idle'}">${live?'earning':'no recapture'}</span></div>`+
+        `<div class="addr">${ADDR[ch+'|'+c.co]||''}</div>`+
+        `<div class="mkt-grid">`+
+        `<span class="l">Liquidations</span><span class="v">${c.n}${c.n>=200?'+':''}</span>`+
+        `<span class="l">Via SVR</span><span class="v">${c.svr}</span>`+
+        `<span class="l">Value liquidated</span><span class="v">${fmtUSD(c.vl)}</span>`+
+        `<span class="l">OEV available</span><span class="v">${fmtUSD(c.av)}</span>`+
+        `<span class="l">To DAO</span><span class="v eth">${live?c.daoeth.toFixed(1)+' ETH':'—'}</span></div>`;
+      g.appendChild(card);
+    });
+    mEl.appendChild(g);
+  });
+
+  new Chart(document.getElementById('routeChart'),{type:'doughnut',
+    data:{labels:['Routed via SVR (mainnet)','Bypassed SVR — liquidator kept OEV'],
+      datasets:[{data:[S.nsvr,S.n-S.nsvr],backgroundColor:['#00D395','#2c3650'],borderColor:'#141926',borderWidth:3}]},
+    options:{maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,usePointStyle:true,padding:14}},
+        title:{display:true,text:'Liquidations by routing (count, all comets)',color:'#e6ebf5',font:{size:13},padding:{bottom:6}},
+        tooltip:{callbacks:{label:c=>c.label+': '+c.raw+' ('+Math.round(c.raw/S.n*100)+'%)'}}}}});
+
+  const AV=S.av_eth, GROSS=S.gross_usd, DAO=S.dao_usd, CL=S.cl_usd, MISS=AV-GROSS;
+  [{l:'Available OEV',v:AV,p:1,c:'#2c3650'},
+   {l:'Leaked to liquidators',v:MISS,p:MISS/AV,c:'#ff5c7c'},
+   {l:'Recaptured (gross)',v:GROSS,p:GROSS/AV,c:'#5b7cf0'},
+   {l:'→ Chainlink (45%)',v:CL,p:CL/AV,c:'#375BD2'},
+   {l:'→ Compound DAO (55%)',v:DAO,p:DAO/AV,c:'#00D395'},
+  ].forEach(r=>{const d=document.createElement('div');d.className='wf';
+   d.innerHTML=`<div>${r.l}</div><div><div class="bar" style="width:${(r.p*100).toFixed(1)}%;background:${r.c}"></div></div>`+
+   `<div class="num">${fmtUSD(r.v)} · ${(r.p*100).toFixed(0)}%</div>`;document.getElementById('waterfall').appendChild(d);});
+
+  new Chart(document.getElementById('monChart'),{
+    data:{labels:M.map(x=>x.m),datasets:[
+      {type:'bar',label:'Total liquidations',data:M.map(x=>x.n),backgroundColor:'#2c3650',borderRadius:4},
+      {type:'bar',label:'Routed via SVR',data:M.map(x=>x.svr),backgroundColor:'#00D395',borderRadius:4}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:12,usePointStyle:true}}},
+     scales:{y:{grid:{color:gridc},title:{display:true,text:'liquidations'}},x:{grid:{display:false}}}}});
+
+  const coSel=document.getElementById('fco');
+  [...new Set(rows.map(r=>r.co))].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;coSel.appendChild(o);});
+
+  let sortK='vl',sortDir=-1,shown=80;
+  const tbody=document.getElementById('tbody');
+  function filtered(){
+    const q=document.getElementById('search').value.trim().toLowerCase();
+    const ch=document.getElementById('fchain').value, co=document.getElementById('fco').value;
+    const so=document.getElementById('fsvr').checked, hd=document.getElementById('fdust').checked;
+    let r=rows.filter(x=>(!ch||x.ch===ch)&&(!co||x.co===co)&&(!so||x.svr===true)&&(!hd||x.vl>=1)&&
+      (!q||x.b.toLowerCase().includes(q)||x.tx.toLowerCase().includes(q)));
+    r.sort((a,b)=>{let va=a[sortK],vb=b[sortK];
+      if(sortK==='svr'){va=va?1:0;vb=vb?1:0;} if(va==null)va=-1; if(vb==null)vb=-1;
+      if(va<vb)return -sortDir;if(va>vb)return sortDir;return 0;});
+    return r;
+  }
+  function render(){
+    const r=filtered();
+    document.getElementById('rowcount').textContent=r.length.toLocaleString()+' of '+rows.length.toLocaleString();
+    tbody.innerHTML=r.slice(0,shown).map(x=>{
+      const svr=x.svr===true?'<span class="pill p-svr">SVR</span>':x.svr===false?'<span class="pill p-no">no</span>':'<span class="pill p-unk">n/a</span>';
+      const exp=x.ch==='Ethereum'?'https://etherscan.io/tx/':x.ch==='Base'?'https://basescan.org/tx/':'https://arbiscan.io/tx/';
+      return `<tr><td>${x.d}</td><td><span class="ch ${x.ch}">${x.ch}</span></td><td><span class="co">${x.co}</span></td>`+
+        `<td><a href="${exp}${x.tx}" target="_blank">${x.b}</a></td>`+
+        `<td>${fmtUSD(x.vl)}</td><td>${fmtUSD(x.av)}</td><td>${svr}</td>`+
+        `<td class="ethv">${fmtETH(x.dao)}</td><td class="ethv">${fmtETH(x.cl)}</td></tr>`;
+    }).join('');
+    document.getElementById('more').style.display=r.length>shown?'block':'none';
+  }
+  document.querySelectorAll('#tbl th[data-k]').forEach(th=>th.addEventListener('click',()=>{
+    const k=th.dataset.k; if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=(['d','vl','av','dao','cl','svr'].includes(k))?-1:1;}
+    document.querySelectorAll('#tbl .ar').forEach(a=>a.textContent='');
+    th.querySelector('.ar').textContent=sortDir<0?'▼':'▲';shown=80;render();}));
+  ['search','fchain','fco','fsvr','fdust'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{shown=80;render();}));
+  document.getElementById('more').addEventListener('click',()=>{shown+=150;render();});
+  render();
+}
+</script>
+</body>
+</html>

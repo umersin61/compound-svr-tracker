@@ -166,7 +166,7 @@ const ADDR={"Ethereum|cUSDCv3":"0xc3d688…84cdc3","Ethereum|cUSDTv3":"0x3Afdc9�
 const fmtUSD=v=>(v==null)?"—":(Math.abs(v)>=1e6?"$"+(v/1e6).toFixed(2)+"M":Math.abs(v)>=1000?"$"+Math.round(v).toLocaleString():"$"+v.toFixed(2));
 const fmtM=v=>"$"+(v/1e6).toFixed(2)+"M";
 
-fetch('./liq_data.json').then(r=>r.json()).then(init).catch(()=>{document.getElementById('err').style.display='block';});
+fetch('./liq_data.json?cb='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(init).catch(()=>{document.getElementById('err').style.display='block';});
 
 function init(DATA){
   const rows=DATA.rows, S=DATA.summary, M=DATA.monthly, CM=DATA.comets;

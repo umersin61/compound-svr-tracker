@@ -109,7 +109,7 @@
 </div>
 
 <h2>SVR markets</h2>
-<div class="h2sub">All comets where SVR price feeds were activated on-chain, with the activation date. Click any card to filter the whole page to that comet. Mainnet is live and earning; Base &amp; Arbitrum are activated but not recapturing on-chain.</div>
+<div class="h2sub">All comets where SVR price feeds were activated on-chain, with the activation date. Click any card to filter the whole page to that comet. Mainnet earns the most; Base &amp; Arbitrum recapture partially via Atlas (some liquidations still leak to the public mempool).</div>
 <div id="markets"></div>
 
 <h2 id="oev-h">Where the OEV went</h2>
@@ -161,8 +161,9 @@
 <div class="card meth">
   <p><b>Activation windows.</b> Liquidations are counted only from the block each comet's feeds were switched to the SVR aggregator on-chain (Comet proxy <code>Upgraded</code> event): Ethereum cUSDTv3 <b>2025-09-18</b>, cUSDCv3 <b>2025-10-23</b>; Base cAEROv3 2026-02-03, cUSDCv3 2026-04-10; Arbitrum cUSDTv3 &amp; cWETHv3 2026-02-12, cUSDCv3 2026-04-10. This removed 468 pre-activation liquidations (incl. 9 falsely credited as SVR on cUSDCv3 before its switch).</p>
   <p><b>Liquidations &amp; available incentive.</b> Every <code>AbsorbDebt</code> event per comet (value liquidated = on-chain <code>usdValue</code>). Available OEV = Σ <code>collateral_usd × storeFrontPriceFactor × (1 − liquidationFactor)</code>, read on-chain. Theoretical-max discount, so "leaked" is an upper bound.</p>
-  <p><b>Recapture (USD at recapture-time).</b> Anchored to the verified <b>354.49 ETH</b> delivered to the DAO recipient (gross ≈ 644 ETH at 55/45), allocated across SVR-routed mainnet liquidations by available incentive and valued at each month's ETH price. Per-row = estimate; the ETH total is exact. Mainnet routing is detected via same-block bids to the Flashbots collector <code>0x149B…</code>.</p>
-  <p><b>Base/Arbitrum — verified against Chainlink docs.</b> Chainlink's docs confirm <b>Atlas</b> (the L2 SVR auction, contract <code>0x583dcFef…</code>, v1.6.4) is <b>live on Base, Arbitrum &amp; BNB with Compound listed as a supported protocol</b> — so SVR is operational there. But on Atlas the winning bundle is submitted by the Chainlink oracle network through the Atlas contract; the largest Compound L2 liquidations (a $428K Arbitrum wstETH liquidation, a $140K Base liquidation) were instead won by independent bots in the <b>public mempool</b> (their own contracts, no Atlas bundle, no bid paid), and the L2 recipient balances are static (1.43 ETH Base / 0.59 ETH Arbitrum, unchanged 90+ days). So Compound's L2 OEV is currently leaking to ordinary liquidators: SVR is switched on, but the Atlas auction isn't effectively capturing these markets (no/low searcher bidding on Compound's L2 feeds). L2 recapture is treated as ~0; the small static balances are not from these liquidations and couldn't be traced (L2 explorer doesn't index the recipient's inflows).</p>
+  <p><b>Routing — how a liquidation is flagged "via SVR" (two rigorous, transfer-independent signals).</b> <u>Mainnet:</u> a liquidation is SVR-routed if the SVR aggregator's price update (the "unlock", a <code>NewTransmission</code> on the DualAggregator behind the OEV feed) lands in the <b>same Flashbots block</b> as the liquidation — the backrun bundle. This is verified per-liquidation (never the same tx; always a same-block sibling), shows ~20× enrichment over the 1.88% random-block baseline, and the routed share (43% by value) matches Chainlink's reported ~45% (Feb 3–9: 50 routed vs Chainlink's 50). <u>L2:</u> Atlas bundles the oracle update + solver op + bid into one <code>metacall</code> tx, so routing and the winning bid are read directly per-tx.</p>
+  <p><b>Recapture amounts.</b> Mainnet: the <b>354.49 ETH</b> actually delivered to the DAO recipient (in periodic, manually-executed Safe batches from the shared Chainlink collector — not per-liquidation) is the verified total; it's allocated across the oracle-routed liquidations by available incentive (per-row = estimate, total = exact). L2: the winning Atlas bid per liquidation is read on-chain (gross ≈ 3.76 ETH → DAO 55% ≈ 2.07 ETH), and 55% of it equals the Base (1.43 ETH) and Arbitrum (0.595 ETH) recipient balances to the wei. All recapture valued in USD at the recapture month's ETH price.</p>
+  <p><b>Base/Arbitrum — partial Atlas recapture (corrected).</b> Chainlink's docs confirm <b>Atlas</b> (the L2 SVR auction; Compound is a listed supported protocol) is live on Base/Arbitrum/BNB. L2 SVR <b>is</b> recapturing for Compound — 36 liquidations routed through Atlas <code>metacall</code> auctions (~3.76 ETH gross), with the DAO's 55% (~2.07 ETH) sitting in the recipient address (an EOA — the Safe isn't deployed on the L2s, so those funds are parked until it is). But coverage is partial: the two largest L2 liquidations (a $428K Arbitrum wstETH and a $141K Base liquidation) were won by independent bots in the <b>public mempool</b> and recaptured nothing. So L2 leaks more than mainnet.</p>
   <p><b>Sources.</b> <a href="https://www.comp.xyz/t/chainlink-svr-onboarding-on-usdc-mainnet/7298" target="_blank">USDC thread + Chainlink reports</a> · <a href="https://www.comp.xyz/t/chainlink-svr-onboarding-on-usdt-mainnet/7221" target="_blank">USDT</a> · <a href="https://www.comp.xyz/t/woof-base-svr-onboarding-proposals/7565" target="_blank">Base</a> · <a href="https://www.comp.xyz/t/woof-arbitrum-svr-onboarding-proposals/7606" target="_blank">Arbitrum</a> · <a href="https://docs.chain.link/data-feeds/svr-feeds/searcher-onboarding-atlas" target="_blank">Chainlink Atlas (L2 SVR) docs</a> · on-chain via Blockscout.</p>
 </div>
 <div class="foot">Independent analysis for Compound governance. Liquidation events, activation blocks, available incentive, and routing flags are verifiable on-chain; per-liquidation recapture amounts are estimates reconciled to verified DAO receipts. Not financial advice.</div>
@@ -234,7 +235,7 @@ function init(DATA){
     document.getElementById('k_n').textContent=A.n.toLocaleString();
     document.getElementById('k_n2').textContent=(A.n-A.nsvr)+' bypassed SVR';
     document.getElementById('k_svr').innerHTML=A.nsvr+' <small>('+(A.n?Math.round(A.nsvr/A.n*100):0)+'%)</small>';
-    document.getElementById('k_svr2').textContent=isL2?'Atlas auction not capturing':'same-block Flashbots bids';
+    document.getElementById('k_svr2').textContent=isL2?'via Atlas auction (per-tx)':(single?'via same-block oracle unlock':'oracle-unlock (L1) + Atlas (L2)');
     document.getElementById('k_av').textContent=fmtM(A.av);
     document.getElementById('k_dao').textContent=A.dao>0?fmtM(A.dao):'—';
     document.getElementById('k_dao2').textContent=A.dao>0?('= '+A.daoE.toFixed(1)+' ETH · Chainlink '+fmtM(A.cl)):(isL2?'no on-chain recapture':'—');
@@ -291,7 +292,7 @@ function init(DATA){
   }
 
   // Ledger
-  let sortK='vl',sortDir=-1,shown=80;
+  let sortK='d',sortDir=-1,shown=80;
   function renderTable(rs){
     const q=document.getElementById('search').value.trim().toLowerCase();
     const so=document.getElementById('fsvr').checked, hd=document.getElementById('fdust').checked;
